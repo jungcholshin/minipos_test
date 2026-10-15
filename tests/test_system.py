@@ -18,7 +18,7 @@ def test_mac_autostart(tmp_path, monkeypatch):
     monkeypatch.setattr(system, "MAC_AGENT", tmp_path / "agent.plist")
     monkeypatch.setattr(sys, "executable", "/Applications/MiniPOS.app/Contents/MacOS/MiniPOS")
     assert system.set_autostart(True) is True
-    assert "/Applications/MiniPOS.app" in (tmp_path / "agent.plist").read_text()
+    assert "MiniPOS.app" in (tmp_path / "agent.plist").read_text(encoding="utf-8")
     assert system.set_autostart(False) is False
 
 

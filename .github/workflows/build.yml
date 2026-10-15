@@ -42,7 +42,15 @@ jobs:
           pip install -r requirements.txt pywebview pyinstaller
 
       - name: Тесты
-        run: python -m pytest -q
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -o pipefail
+          python -m pytest -q -rfE 2>&1 | tee pytest.log || {
+            grep -E "^(FAILED|ERROR)" pytest.log | while read -r line; do echo "::error title=Тест не прошёл::$line"; done
+            tail -40 pytest.log | sed 's/^/::error title=pytest::/' | head -40
+            exit 1; }
 
       - name: Собрать
         run: >
