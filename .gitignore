@@ -1,0 +1,14 @@
+# данные и секреты — не загружать на GitHub
+minipos.db
+*.db
+settings.env
+backups/
+minipos.log
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+build/
+dist/
+*.spec
+.DS_Store

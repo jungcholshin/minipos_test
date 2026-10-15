@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniPOS</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">MiniPOS <span id="appVersion"></span></div>
+  <nav>
+    <button data-tab="pos" class="active">Касса</button>
+    <button data-tab="products">Товары</button>
+    <button data-tab="stock">Склад</button>
+    <button data-tab="sales">Продажи</button>
+    <button data-tab="clients">Оптовики</button>
+    <button data-tab="dashboard">Dashboard</button>
+    <button data-tab="chat">ИИ-чат</button>
+    <button data-tab="settings" title="Настройки">⚙</button>
+  </nav>
+</header>
+
+<main>
+  <!-- КАССА -->
+  <section id="pos" class="tab active">
+    <div class="pos">
+      <div class="panel">
+        <input id="posSearch" placeholder="Сканируйте штрихкод или введите название… (Enter)" autofocus>
+        <div id="posResults" class="results"></div>
+      </div>
+      <div class="panel receipt">
+        <div class="mode">
+          <button type="button" data-mode="RETAIL" class="active">Розница</button>
+          <button type="button" data-mode="WHOLESALE">Опт</button>
+        </div>
+        <div id="wholesaleBox" hidden>
+          <select id="posClient"></select>
+          <div id="clientInfo" class="client-info"></div>
+        </div>
+        <h2 id="receiptTitle">Чек · розница</h2>
+        <table id="cart"><tbody></tbody></table>
+        <div class="discount">
+          <span>Скидка:</span>
+          <button type="button" data-pct="0" class="active">нет</button>
+          <button type="button" data-pct="5">5%</button>
+          <button type="button" data-pct="10">10%</button>
+          <button type="button" data-pct="15">15%</button>
+          <input id="discAmount" type="number" min="0" placeholder="₸">
+        </div>
+        <div id="cartSums" class="sums"></div>
+        <div class="total">ИТОГО: <b id="cartTotal">0 ₸</b></div>
+        <div class="pay">
+          <select id="payMethod">
+            <option value="CASH">Наличные</option>
+            <option value="CARD">Карта</option>
+            <option value="TRANSFER">Перевод</option>
+            <option value="OTHER">Другое</option>
+          </select>
+          <button id="checkout" class="primary">ОПЛАТИТЬ</button>
+        </div>
+        <button id="clearCart" class="link">Очистить чек</button>
+        <pre id="lastReceipt" class="receipt-print" hidden></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ТОВАРЫ -->
+  <section id="products" class="tab">
+    <div class="panel">
+      <h2>Загрузить свой каталог из Excel</h2>
+      <p class="muted small">Заполните шаблон (название, категория, штрихкод, закупка, опт или розница, остаток) и загрузите.
+        Сначала будет предпросмотр — ничего не изменится, пока не нажмёте «Загрузить».
+        Уже существующие товары (тот же штрихкод или название) обновятся.</p>
+      <div class="toolbar">
+        <a class="btn" href="/import/template">Скачать шаблон</a>
+        <label class="btn file-btn">Выбрать файл (.xlsx, .csv)
+          <input type="file" id="importFile" accept=".xlsx,.xlsm,.csv" hidden></label>
+        <span id="importName" class="muted small"></span>
+      </div>
+      <div id="importPreview" hidden>
+        <div id="importSummary" class="import-summary"></div>
+        <div class="import-table"><table class="data" id="importTable"></table></div>
+        <div class="toolbar" style="margin-top:12px">
+          <button id="importApply" class="primary">Загрузить</button>
+          <button id="importCancel">Отмена</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Новый товар</h2>
+      <form id="productForm" class="grid-form">
+        <input name="name" placeholder="Название *" required>
+        <select name="category_id" required></select>
+        <input name="purchase_price" type="number" min="0" placeholder="Закупка, ₸ *" required>
+        <input name="wholesale_price" type="number" min="0" placeholder="Опт, ₸ *" required>
+        <input name="selling_price" type="number" min="0" placeholder="Розница — посчитается">
+        <input name="barcode" placeholder="Штрихкод">
+        <input name="sku" placeholder="Артикул">
+        <input name="minimum_stock" type="number" min="0" placeholder="Мин. остаток">
+        <button class="primary">Добавить</button>
+      </form>
+      <form id="categoryForm" class="inline-form">
+        <input name="name" placeholder="Новая категория" required>
+        <button>Добавить категорию</button>
+      </form>
+    </div>
+    <div class="panel">
+      <div class="toolbar">
+        <input id="prodSearch" placeholder="Поиск…">
+        <select id="prodCategory"><option value="">Все категории</option></select>
+        <button id="recalcRetail" title="Розница = опт × коэффициент для всех товаров">Пересчитать розницу</button>
+      </div>
+      <p class="muted small" id="pricingNote"></p>
+      <table class="data" id="productsTable"></table>
+    </div>
+  </section>
+
+  <!-- СКЛАД -->
+  <section id="stock" class="tab">
+    <div class="panel">
+      <h2>Остатки</h2>
+      <p class="muted">Стоимость запасов (по закупке): <b id="invValue"></b></p>
+      <table class="data" id="stockTable"></table>
+    </div>
+    <div class="panel">
+      <h2>История движения</h2>
+      <table class="data" id="movesTable"></table>
+    </div>
+  </section>
+
+  <!-- ПРОДАЖИ -->
+  <section id="sales" class="tab">
+    <div class="panel">
+      <div class="toolbar">
+        <h2 style="margin:0">История продаж</h2>
+        <select id="salesType">
+          <option value="">Все</option>
+          <option value="RETAIL">Розница</option>
+          <option value="WHOLESALE">Опт</option>
+        </select>
+        <select id="salesClient"><option value="">Все клиенты</option></select>
+      </div>
+      <table class="data" id="salesTable"></table>
+    </div>
+  </section>
+
+  <!-- ОПТОВЫЕ КЛИЕНТЫ -->
+  <section id="clients" class="tab">
+    <div class="panel">
+      <h2>Новый оптовый клиент</h2>
+      <form id="clientForm" class="grid-form">
+        <input name="name" placeholder="Имя / название *" required>
+        <input name="phone" placeholder="Телефон">
+        <input name="bin_iin" placeholder="БИН / ИИН">
+        <input name="city" placeholder="Город">
+        <input name="note" placeholder="Заметка">
+        <button class="primary">Добавить</button>
+      </form>
+      <p class="muted small" id="conditionsNote"></p>
+    </div>
+    <div class="panel">
+      <div class="toolbar">
+        <h2 style="margin:0">Оптовики</h2>
+        <select id="clientFilter">
+          <option value="">Все</option>
+          <option value="problems">Нарушили / под угрозой</option>
+          <option value="OK">Выполняют</option>
+          <option value="NEW">Без закупов</option>
+        </select>
+      </div>
+      <table class="data" id="clientsTable"></table>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="tab">
+    <div class="toolbar">
+      <label>С <input type="date" id="dFrom"></label>
+      <label>По <input type="date" id="dTo"></label>
+      <button id="dApply">Показать</button>
+      <a class="btn" href="/reports/export">Экспорт в Excel</a>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="two">
+      <div class="panel"><h2>Выручка по дням</h2><div id="chart" class="chart"></div></div>
+      <div class="panel"><h2>Топ товаров</h2><table class="data" id="topTable"></table></div>
+    </div>
+    <div class="panel"><h2>Низкий остаток</h2><table class="data" id="lowTable"></table></div>
+  </section>
+  <!-- ИИ-ЧАТ -->
+  <section id="chat" class="tab">
+    <div class="panel chat">
+      <div class="chat-head">
+        <h2>ИИ-помощник</h2>
+        <span id="aiStatus" class="badge">проверка…</span>
+        <button id="chatReset" class="link">Новый диалог</button>
+      </div>
+      <div id="aiHint" class="hint" hidden></div>
+      <div id="chatLog" class="chat-log">
+        <div class="msg bot">Здравствуйте! Спросите про остатки, продажи и прибыль или попросите изменить данные — например «пришло 10 KERASYS Damage Clinic» или «убери BERGAMO из продажи». Любое изменение выполнится только после кнопки «Подтвердить».</div>
+      </div>
+      <div class="chips">
+        <button data-q="Что заканчивается?">Что заканчивается?</button>
+        <button data-q="Какая выручка и прибыль за последние 7 дней?">Выручка за неделю</button>
+        <button data-q="Какие товары продаются лучше всего в этом месяце?">Топ товаров</button>
+        <button data-q="Какие товары покупали меньше всего за последние 30 дней?">Что не продаётся</button>
+        <button data-q="Какие оптовики не выполнили условие закупа?">Оптовики-нарушители</button>
+      </div>
+      <form id="chatForm" class="chat-form">
+        <input id="chatInput" placeholder="Напишите сообщение…" autocomplete="off">
+        <button class="primary">Отправить</button>
+      </form>
+    </div>
+  </section>
+  <!-- НАСТРОЙКИ -->
+  <section id="settings" class="tab">
+    <div class="panel" style="max-width:720px">
+      <h2>Настройки</h2>
+      <label class="check"><input type="checkbox" id="autostart"> Запускать MiniPOS при включении компьютера</label>
+      <p class="muted small">Программа будет открываться сама, когда вы входите в Windows / macOS.</p>
+      <p><button id="desktopShortcut">Создать ярлык на рабочем столе</button></p>
+      <p id="sysNote" class="hint" hidden></p>
+      <h2 style="margin-top:24px">О программе</h2>
+      <table class="data" id="sysInfo"></table>
+      <p class="muted small">Цены, условия для оптовиков, ИИ и Telegram настраиваются в файле <b>settings.env</b>
+        в папке с данными (откройте Блокнотом, после изменения перезапустите программу).</p>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

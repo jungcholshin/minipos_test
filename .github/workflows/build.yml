@@ -1,0 +1,72 @@
+# Сборка MiniPOS для Windows (.exe) и Mac (.app) на серверах GitHub.
+# Запуск:
+#   • вручную: вкладка Actions → Build MiniPOS → Run workflow (файлы — внизу страницы запуска, в Artifacts)
+#   • при создании версии: git tag v0.3 && git push origin v0.3 → файлы появятся в Releases
+name: Build MiniPOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            sep: ";"
+            artifact: MiniPOS-windows.zip
+          - os: macos-latest
+            sep: ":"
+            artifact: MiniPOS-mac.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pywebview pyinstaller
+
+      - name: Тесты
+        run: python -m pytest -q
+
+      - name: Собрать
+        run: >
+          pyinstaller --noconfirm --clean --windowed --name MiniPOS
+          --osx-bundle-identifier kz.mizonyalyan.minipos
+          --add-data "app/static${{ matrix.sep }}app/static"
+          --collect-submodules uvicorn
+          --collect-submodules app
+          desktop.py
+
+      - name: Упаковать (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item README.md "dist/MiniPOS/Инструкция.txt"
+          Compress-Archive -Path dist/MiniPOS -DestinationPath ${{ matrix.artifact }}
+
+      - name: Упаковать (Mac)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent dist/MiniPOS.app ${{ matrix.artifact }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+      - name: Опубликовать в Releases (только для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}
